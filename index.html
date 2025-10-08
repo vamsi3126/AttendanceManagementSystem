@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Management System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Attendance Management System</h1>
+            <p>Track student attendance easily and efficiently</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="showTab('dashboard')">Dashboard</button>
+            <button class="tab-button" onclick="showTab('students')">Students</button>
+            <button class="tab-button" onclick="showTab('attendance')">Mark Attendance</button>
+            <button class="tab-button" onclick="showTab('reports')">Reports</button>
+            <button class="tab-button" onclick="showTab('data')">Data Management</button>
+        </nav>
+
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Students</h3>
+                    <span id="totalStudents" class="stat-number">0</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Today's Attendance</h3>
+                    <span id="todayAttendance" class="stat-number">0%</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Attendance</h3>
+                    <span id="avgAttendance" class="stat-number">0%</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Classes</h3>
+                    <span id="totalClasses" class="stat-number">0</span>
+                </div>
+            </div>
+            
+            <div class="recent-activity">
+                <h2>Recent Activity</h2>
+                <div id="recentActivity" class="activity-list">
+                    <p>No recent activity</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="students" class="tab-content">
+            <div class="section-header">
+                <h2>Student Management</h2>
+                <button class="btn btn-primary" onclick="showAddStudentForm()">Add New Student</button>
+            </div>
+            
+            <div id="addStudentForm" class="form-container" style="display: none;">
+                <h3>Add New Student</h3>
+                <form onsubmit="addStudent(event)">
+                    <div class="form-group">
+                        <label for="studentName">Student Name:</label>
+                        <input type="text" id="studentName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentId">Student ID:</label>
+                        <input type="text" id="studentId" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentEmail">Email:</label>
+                        <input type="email" id="studentEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentClass">Class:</label>
+                        <input type="text" id="studentClass" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add Student</button>
+                        <button type="button" class="btn btn-secondary" onclick="hideAddStudentForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="students-list">
+                <h3>Registered Students</h3>
+                <div id="studentsTable" class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Class</th>
+                                <th>Attendance %</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="attendance" class="tab-content">
+            <div class="section-header">
+                <h2>Mark Attendance</h2>
+                <div class="attendance-date">
+                    <label for="attendanceDate">Date:</label>
+                    <input type="date" id="attendanceDate" required>
+                </div>
+            </div>
+            
+            <div class="attendance-form">
+                <div class="class-selection">
+                    <label for="selectedClass">Select Class:</label>
+                    <select id="selectedClass" onchange="loadStudentsForAttendance()">
+                        <option value="">Select a class</option>
+                    </select>
+                </div>
+                
+                <div id="attendanceList" class="attendance-list" style="display: none;">
+                    <h3>Mark Attendance for <span id="className"></span></h3>
+                    <div id="studentsAttendanceList">
+                    </div>
+                    <div class="attendance-actions">
+                        <button class="btn btn-success" onclick="markAllPresent()">Mark All Present</button>
+                        <button class="btn btn-danger" onclick="markAllAbsent()">Mark All Absent</button>
+                        <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="reports" class="tab-content">
+            <div class="section-header">
+                <h2>Attendance Reports</h2>
+                <div class="report-filters">
+                    <select id="reportClass">
+                        <option value="">All Classes</option>
+                    </select>
+                    <select id="reportPeriod">
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="reports-grid">
+                <div class="report-card">
+                    <h3>Individual Report</h3>
+                    <select id="individualStudent">
+                        <option value="">Select Student</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="generateIndividualReport()">Generate Report</button>
+                    <button class="btn btn-success" onclick="downloadIndividualReport()" id="downloadIndividualBtn" style="display: none;">📥 Download Report</button>
+                    <div id="individualReport" class="report-content"></div>
+                </div>
+                
+                <div class="report-card">
+                    <h3>Class Report</h3>
+                    <select id="classReport">
+                        <option value="">Select Class</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="generateClassReport()">Generate Report</button>
+                    <button class="btn btn-success" onclick="downloadClassReport()" id="downloadClassBtn" style="display: none;">📥 Download Report</button>
+                    <div id="classReportContent" class="report-content"></div>
+                </div>
+                
+                <div class="report-card">
+                    <h3>Overall Statistics</h3>
+                    <button class="btn btn-primary" onclick="generateOverallStats()">Generate Stats</button>
+                    <button class="btn btn-success" onclick="downloadOverallStats()" id="downloadOverallBtn" style="display: none;">📥 Download Report</button>
+                    <div id="overallStats" class="report-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="data" class="tab-content">
+            <div class="section-header">
+                <h2>Data Management</h2>
+                <p>Manage your attendance data and localStorage</p>
+            </div>
+            
+            <div class="data-management-grid">
+                <div class="data-card">
+                    <h3>Storage Information</h3>
+                    <div id="storageInfo" class="storage-info">
+                        <p><strong>Storage Status:</strong> <span id="storageStatus">Checking...</span></p>
+                        <p><strong>Total Students:</strong> <span id="storageStudents">0</span></p>
+                        <p><strong>Data Size:</strong> <span id="storageSize">0 KB</span></p>
+                        <p><strong>Last Updated:</strong> <span id="lastUpdated">Never</span></p>
+                    </div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>Data Actions</h3>
+                    <div class="data-actions">
+                        <button class="btn btn-primary" onclick="saveDataToStorage(); updateStorageInfo(); showMessage('Data saved successfully!', 'success')">
+                            💾 Save Data
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadDataFromStorage(); updateDashboard(); updateClassDropdowns(); updateStudentDropdowns(); updateStudentsTable(); updateStorageInfo(); showMessage('Data loaded successfully!', 'success')">
+                            📂 Load Data
+                        </button>
+                        <button class="btn btn-success" onclick="exportData()">
+                            📤 Export Data
+                        </button>
+                        <button class="btn btn-danger" onclick="clearAllData(); updateStorageInfo()">
+                            🗑️ Clear All Data
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="data-card">
+                    <h3>localStorage Details</h3>
+                    <div class="localStorage-details">
+                        <p><strong>localStorage Status:</strong> <span id="localStorageStatus">Checking...</span></p>
+                        <p><strong>Browser Support:</strong> <span id="browserSupport">Checking...</span></p>
+                        <p><strong>Available Space:</strong> <span id="availableSpace">Unknown</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="developer-link">
+                <a class="devepLink" href="https://portfolio-new-drab-pi.vercel.app">< Developer ></a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    
+</body>
+</html>
