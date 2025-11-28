@@ -92,6 +92,44 @@ db.serialize(() => {
     FOREIGN KEY(actor_user_id) REFERENCES users(id)
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    url TEXT NOT NULL,
+    class_id INTEGER,
+    uploaded_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(class_id) REFERENCES classes(id),
+    FOREIGN KEY(uploaded_by) REFERENCES users(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS marks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    subject TEXT NOT NULL,
+    score REAL NOT NULL,
+    max_score REAL NOT NULL,
+    uploaded_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(student_id) REFERENCES students(id),
+    FOREIGN KEY(uploaded_by) REFERENCES users(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS complaints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_user_id INTEGER NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open','resolved')),
+    response_text TEXT,
+    responded_by INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT,
+    FOREIGN KEY(student_user_id) REFERENCES users(id),
+    FOREIGN KEY(responded_by) REFERENCES users(id)
+  )`);
+
   // Seed admin if none exists
   db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
     if (err) return console.error(err);
@@ -290,6 +328,51 @@ app.post('/api/attendance/mark', auth, requireRole('admin', 'teacher'), (req, re
   });
 });
 
+app.post('/api/attendance/self-mark', auth, requireRole('student'), (req, res) => {
+  const { studentExtId } = req.body;
+  if (!studentExtId) return res.status(400).json({ error: 'Missing fields' });
+  db.get('SELECT * FROM students WHERE student_ext_id = ?', [studentExtId], (err, stRow) => {
+    if (err || !stRow) return res.status(404).json({ error: 'Student not found' });
+    const today = new Date().toISOString().split('T')[0];
+    db.get('SELECT * FROM sessions WHERE class_id = ? AND date = ?', [stRow.class_id, today], (err2, sess) => {
+      if (err2) return res.status(500).json({ error: 'Failed to find session' });
+      const ensureSession = (cb) => {
+        if (sess) return cb(sess.id);
+        const now = new Date().toISOString();
+        db.run(
+          'INSERT INTO sessions(class_id,date,status,created_by,created_at) VALUES(?,?,?,?,?)',
+          [stRow.class_id, today, 'open', req.user.id, now],
+          function (e3) {
+            if (e3) return res.status(500).json({ error: 'Failed to create session' });
+            cb(this.lastID);
+          }
+        );
+      };
+      ensureSession((sessionId) => {
+        const cutoffTs = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        db.get(
+          'SELECT * FROM attendance WHERE student_id = ? AND marked_at >= ? ORDER BY marked_at DESC LIMIT 1',
+          [stRow.id, cutoffTs],
+          (err4, recent) => {
+            if (err4) return res.status(500).json({ error: 'Failed to check last mark' });
+            if (recent) return res.status(429).json({ error: 'Already marked within 24 hours' });
+            const now = new Date().toISOString();
+            db.run(
+              'INSERT INTO attendance(session_id,student_id,status,marked_by,marked_at) VALUES(?,?,?,?,?) ON CONFLICT(session_id,student_id) DO NOTHING',
+              [sessionId, stRow.id, 'present', req.user.id, now],
+              function (err5) {
+                if (err5) return res.status(500).json({ error: 'Failed to mark attendance' });
+                logAction(req.user.id, 'self_mark', 'attendance', null, { sessionId, studentId: stRow.id });
+                res.json({ ok: true });
+              }
+            );
+          }
+        );
+      });
+    });
+  });
+});
+
 app.post('/api/sessions/:id/finalize', auth, requireRole('admin', 'teacher'), (req, res) => {
   const sessionId = req.params.id;
   db.run('UPDATE sessions SET status = ? WHERE id = ?', ['finalized', sessionId], function (err) {
@@ -341,6 +424,21 @@ app.get('/api/reports/student/:id', auth, (req, res) => {
   });
 });
 
+app.get('/api/attendance/student/:extId', auth, (req, res) => {
+  const sql = `
+    SELECT sess.date as date, a.status
+    FROM students st
+    LEFT JOIN attendance a ON a.student_id = st.id
+    LEFT JOIN sessions sess ON sess.id = a.session_id
+    WHERE st.student_ext_id = ?
+    ORDER BY sess.date ASC
+  `;
+  db.all(sql, [req.params.extId], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch attendance' });
+    res.json(rows);
+  });
+});
+
 app.get('/api/reports/class/:id', auth, (req, res) => {
   const sql = `
     SELECT st.id as studentId, st.name as studentName, st.student_ext_id as extId,
@@ -361,6 +459,118 @@ app.get('/api/reports/class/:id', auth, (req, res) => {
     }));
     res.json(formatted);
   });
+});
+
+app.get('/api/materials', auth, (req, res) => {
+  const { classId } = req.query;
+  const params = [];
+  let sql = 'SELECT * FROM materials';
+  if (classId) { sql += ' WHERE class_id = ?'; params.push(classId); }
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch materials' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/materials', auth, requireRole('admin', 'teacher'), (req, res) => {
+  const { title, description, url, classId } = req.body;
+  if (!title || !url) return res.status(400).json({ error: 'Missing fields' });
+  const now = new Date().toISOString();
+  db.run(
+    'INSERT INTO materials(title,description,url,class_id,uploaded_by,created_at) VALUES(?,?,?,?,?,?)',
+    [title, description || null, url, classId || null, req.user.id, now],
+    function (err) {
+      if (err) return res.status(500).json({ error: 'Failed to add material' });
+      logAction(req.user.id, 'create', 'material', this.lastID, { title, classId });
+      res.json({ id: this.lastID, title, description, url, classId });
+    }
+  );
+});
+
+app.get('/api/marks/student/:extId', auth, (req, res) => {
+  db.get('SELECT id FROM students WHERE student_ext_id = ?', [req.params.extId], (err, st) => {
+    if (err || !st) return res.status(404).json({ error: 'Student not found' });
+    db.all('SELECT * FROM marks WHERE student_id = ? ORDER BY created_at DESC', [st.id], (err2, rows) => {
+      if (err2) return res.status(500).json({ error: 'Failed to fetch marks' });
+      res.json(rows);
+    });
+  });
+});
+
+app.get('/api/marks/class/:id', auth, (req, res) => {
+  const sql = `
+    SELECT m.id, m.subject, m.score, m.max_score, s.student_ext_id as extId, s.name
+    FROM marks m
+    JOIN students s ON s.id = m.student_id
+    WHERE s.class_id = ?
+    ORDER BY m.created_at DESC
+  `;
+  db.all(sql, [req.params.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch class marks' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/marks', auth, requireRole('admin', 'teacher'), (req, res) => {
+  const { studentExtId, subject, score, maxScore } = req.body;
+  if (!studentExtId || !subject || score === undefined || maxScore === undefined) return res.status(400).json({ error: 'Missing fields' });
+  db.get('SELECT * FROM students WHERE student_ext_id = ?', [studentExtId], (err, st) => {
+    if (err || !st) return res.status(404).json({ error: 'Student not found' });
+    const now = new Date().toISOString();
+    db.run(
+      'INSERT INTO marks(student_id,subject,score,max_score,uploaded_by,created_at) VALUES(?,?,?,?,?,?)',
+      [st.id, subject, Number(score), Number(maxScore), req.user.id, now],
+      function (err2) {
+        if (err2) return res.status(500).json({ error: 'Failed to add mark' });
+        logAction(req.user.id, 'create', 'mark', this.lastID, { studentId: st.id, subject });
+        res.json({ id: this.lastID });
+      }
+    );
+  });
+});
+
+app.post('/api/complaints', auth, requireRole('student'), (req, res) => {
+  const { subject, message } = req.body;
+  if (!subject || !message) return res.status(400).json({ error: 'Missing fields' });
+  const now = new Date().toISOString();
+  db.run(
+    'INSERT INTO complaints(student_user_id,subject,message,status,created_at) VALUES(?,?,?,?,?)',
+    [req.user.id, subject, message, 'open', now],
+    function (err) {
+      if (err) return res.status(500).json({ error: 'Failed to submit complaint' });
+      logAction(req.user.id, 'create', 'complaint', this.lastID, { subject });
+      res.json({ id: this.lastID });
+    }
+  );
+});
+
+app.get('/api/complaints/my', auth, requireRole('student'), (req, res) => {
+  db.all('SELECT * FROM complaints WHERE student_user_id = ? ORDER BY created_at DESC', [req.user.id], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch complaints' });
+    res.json(rows);
+  });
+});
+
+app.get('/api/complaints', auth, requireRole('admin', 'teacher'), (req, res) => {
+  db.all('SELECT * FROM complaints ORDER BY created_at DESC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Failed to fetch complaints' });
+    res.json(rows);
+  });
+});
+
+app.patch('/api/complaints/:id', auth, requireRole('admin', 'teacher'), (req, res) => {
+  const { responseText, status } = req.body;
+  const finalStatus = status && ['open','resolved'].includes(status) ? status : 'resolved';
+  const now = new Date().toISOString();
+  db.run(
+    'UPDATE complaints SET response_text = ?, responded_by = ?, status = ?, updated_at = ? WHERE id = ?',
+    [responseText || null, req.user.id, finalStatus, now, req.params.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: 'Failed to update complaint' });
+      logAction(req.user.id, 'update', 'complaint', req.params.id, { status: finalStatus });
+      res.json({ updated: this.changes > 0 });
+    }
+  );
 });
 
 app.get('/api/health', (req, res) => {

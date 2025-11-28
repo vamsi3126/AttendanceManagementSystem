@@ -6,9 +6,9 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
     min-height: 100vh;
-    color: rgb(51, 51, 51);
+    color: rgb(36, 36, 36);
 }
 
 .container {
@@ -26,7 +26,7 @@ header {
     text-align: center;
     margin-bottom: 30px;
     padding: 20px;
-    background: linear-gradient(45deg, rgb(76, 175, 80), rgb(69, 160, 73));
+    background: linear-gradient(45deg, #1e3a8a, #2563eb);
     border-radius: 10px;
     color: white;
 }
@@ -86,38 +86,29 @@ header p {
     box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
-.tabs {
-    display: flex;
+.sidebar {
+    width: 260px;
     background: rgb(248, 249, 250);
     border-radius: 10px;
-    padding: 5px;
-    margin-bottom: 30px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: fit-content;
 }
 
-.tab-button {
-    flex: 1;
-    padding: 15px 20px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    color: rgb(102, 102, 102);
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgb(221,221,221);
+    margin-bottom: 10px;
 }
 
-.tab-button:hover {
-    background: rgba(76, 175, 80, 0.1);
-    color: rgb(76, 175, 80);
-}
-
-.tab-button.active {
-    background: rgb(76, 175, 80);
-    color: white;
-    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-}
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: #2563eb; display:flex; align-items:center; justify-content:center; color:white; }
+.side-nav { display: flex; flex-direction: column; gap: 8px; }
+.side-link { padding: 10px 12px; border: none; background: transparent; text-align: left; border-radius: 8px; cursor:pointer; color: rgb(80,80,80); }
+.side-link:hover { background: rgba(37,99,235,0.1); color: #2563eb; }
+.side-link.active { background: #2563eb; color: white; }
 
 .tab-content {
     display: none;
@@ -146,7 +137,7 @@ header p {
     border-radius: 12px;
     text-align: center;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    border-left: 4px solid rgb(76, 175, 80);
+    border-left: 4px solid #2563eb;
     transition: transform 0.3s ease;
 }
 
@@ -165,7 +156,7 @@ header p {
 .stat-number {
     font-size: 2.5rem;
     font-weight: bold;
-    color: rgb(76, 175, 80);
+    color: #3b82f6;
 }
 
 .recent-activity {
@@ -178,7 +169,7 @@ header p {
 .recent-activity h2 {
     margin-bottom: 20px;
     color: rgb(51, 51, 51);
-    border-bottom: 2px solid rgb(76, 175, 80);
+    border-bottom: 2px solid #2563eb;
     padding-bottom: 10px;
 }
 
@@ -215,14 +206,14 @@ header p {
 }
 
 .btn-primary {
-    background: rgb(76, 175, 80);
+    background: #2563eb;
     color: white;
 }
 
 .btn-primary:hover {
-    background: rgb(69, 160, 73);
+    background: #1d4ed8;
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
 }
 
 .btn-secondary {
@@ -431,7 +422,7 @@ table tr:hover {
     padding: 25px;
     border-radius: 12px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    border-top: 4px solid rgb(76, 175, 80);
+    border-top: 4px solid #2563eb;
 }
 
 .report-card h3 {
@@ -583,7 +574,7 @@ table tr:hover {
     padding: 25px;
     border-radius: 12px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    border-top: 4px solid rgb(76, 175, 80);
+    border-top: 4px solid #2563eb;
 }
 
 .data-card h3 {
@@ -600,7 +591,7 @@ table tr:hover {
 
 .storage-info span,
 .localStorage-details span {
-    color: rgb(76, 175, 80);
+    color: #2563eb;
     font-weight: 600;
 }
 
@@ -650,18 +641,9 @@ body.dark header {
     color: white;
 }
 
-body.dark .tabs {
-    background: rgb(30, 30, 30);
-}
-
-body.dark .tab-button {
-    color: rgb(200, 200, 200);
-}
-
-body.dark .tab-button:hover {
-    background: rgba(76, 175, 80, 0.15);
-    color: white;
-}
+body.dark .sidebar { background: rgb(30,30,30); }
+body.dark .side-link { color: rgb(200,200,200); }
+body.dark .side-link:hover { background: rgba(37,99,235,0.15); color: white; }
 
 body.dark .stat-card,
 body.dark .recent-activity,
@@ -691,3 +673,24 @@ body.dark .footer {
     background: rgb(30, 30, 30);
     border-top: 1px solid rgb(60, 60, 60);
 }
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.calendar .day { background: white; border: 1px solid rgb(238,238,238); border-radius: 8px; padding: 10px; text-align: center; }
+.day.present { border-color: rgb(76,175,80); background: rgba(76,175,80,0.1); }
+.day.absent { border-color: rgb(220,53,69); background: rgba(220,53,69,0.1); }
+.day.late { border-color: rgb(255,193,7); background: rgba(255,193,7,0.1); }
+
+.card { background: white; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); padding: 16px; }
+.table-container table { width: 100%; border-collapse: collapse; }
+.table-container th, .table-container td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+.table-container thead th { background: rgba(37,99,235,0.08); color: #1e3a8a; }
+.split-grid { display: grid; grid-template-columns: 330px 1fr; gap: 20px; align-items: start; }
+.split-left { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+.split-right { }
+.top-nav { display:flex; gap:8px; align-items:center; background:white; padding:10px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.08); margin-bottom:14px; }
+.top-link { padding:10px 12px; border:none; background:transparent; border-radius:8px; cursor:pointer; color:#2563eb; font-weight:600; }
+.top-link.active { background:#2563eb; color:white; }
+.top-link:hover { background:rgba(37,99,235,0.1); }
+.input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #d1d5db; margin-top: 8px; font-size: 1rem; }
+.btn-submit { background: linear-gradient(90deg, #3b82f6, #06b6d4); color: white; }
+.btn-submit:hover { filter: brightness(0.95); }
+.btn-back { background: #e2e8f0; color: #0f172a; }

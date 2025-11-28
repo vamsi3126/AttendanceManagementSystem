@@ -12,8 +12,8 @@
             <div class="brand">
                 <div class="brand-icon">📚</div>
                 <div class="brand-text">
-                    <h1>Attendance Management System</h1>
-                    <p>Track classes, sessions, and attendance with ease</p>
+                    <h1 id="headerTitle">Attendance Management System</h1>
+                    <p id="headerSubtitle">Secure Login</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -21,39 +21,100 @@
             </div>
         </header>
 
-        <nav class="tabs">
-            <button id="tab-dashboard" class="tab-button active" onclick="showTab(event, 'dashboard')">🏠 Dashboard</button>
-            <button id="tab-students" class="tab-button" onclick="showTab(event, 'students')">👥 Students</button>
-            <button id="tab-attendance" class="tab-button" onclick="showTab(event, 'attendance')">✅ Mark Attendance</button>
-            <button id="tab-reports" class="tab-button" onclick="showTab(event, 'reports')">📊 Reports</button>
-            <button id="tab-data" class="tab-button" onclick="showTab(event, 'data')">🗂️ Data</button>
-            <button id="tab-auth" class="tab-button" onclick="showTab(event, 'auth')">🔐 Account</button>
-        </nav>
+        <div style="display:flex; gap:20px;">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="avatar">🎓</div>
+                    <div class="user-info"><span id="sidebarUser">Guest</span></div>
+                </div>
+                <nav class="side-nav">
+                    <button id="tab-dashboard" class="side-link active" onclick="showTab(event, 'dashboard')">🏠 Overview</button>
+                    <button id="tab-auth" class="side-link" onclick="showTab(event, 'auth')">🔐 Login</button>
+                    <button id="tab-attendance" class="side-link" onclick="showTab(event, 'attendance')">✅ Upload Attendance</button>
+                    <button id="tab-viewattendance" class="side-link" onclick="showTab(event, 'viewattendance')">📅 Check Attendance</button>
+                    <button id="tab-students" class="side-link" onclick="showTab(event, 'students')">👥 Students</button>
+                    <button id="tab-materials" class="side-link" onclick="showTab(event, 'materials')">📁 Download/Upload Materials</button>
+                    <button id="tab-marks" class="side-link" onclick="showTab(event, 'marks')">📝 Check/Upload Marks</button>
+                    <button id="tab-complaints" class="side-link" onclick="showTab(event, 'complaints')">📣 Raise Complaints</button>
+                    <button id="tab-reports" class="side-link" onclick="showTab(event, 'reports')">📊 Reports</button>
+                    <button id="tab-admin" class="side-link" onclick="showTab(event, 'admin')">🛠️ Admin Panel</button>
+                    <button class="side-link" onclick="logoutUser()">🚪 Logout</button>
+                </nav>
+            </aside>
+            <div style="flex:1">
+                <nav id="studentTopNav" class="top-nav" style="display:none;">
+                    <button class="top-link active" onclick="showTab(event, 'viewattendance')">📅 Check Attendance</button>
+                    <button class="top-link" onclick="showTab(event, 'materials')">📁 Download Materials</button>
+                    <button class="top-link" onclick="showTab(event, 'marks')">📝 Check Marks</button>
+                    <button class="top-link" onclick="showTab(event, 'complaints')">📣 Raise Complaints</button>
+                    <span style="flex:1"></span>
+                    <button class="top-link" onclick="logoutUser()">🚪 Logout</button>
+                </nav>
+                
+                <div id="dashboard" class="tab-content active">
+                    <div class="split-grid">
+                        <div class="split-left">
+                            <div class="section-header">
+                                <h2>Attendance</h2>
+                            </div>
+                            <div class="form-container">
+                                <div class="form-group">
+                                    <label for="dashStudentId">Student ID</label>
+                                    <div style="display:flex; gap:8px;">
+                                        <input type="text" id="dashStudentId" placeholder="Enter your Student ID">
+                                        <button class="btn btn-secondary" onclick="saveMyIdFromDashboard()">Save</button>
+                                    </div>
+                                </div>
+                                <div id="studentDashCalendar"></div>
+                                <div style="margin-top:8px; color:#666;">Attendance: <span id="studentDashPercent">0%</span></div>
+                                <div style="margin-top:16px;" id="studentAttendanceRecords"></div>
+                            </div>
+                        </div>
+                        <div class="split-right">
+                            <div class="section-header">
+                                <h2>Grades & Marks</h2>
+                            </div>
+                            <div class="table-container" id="studentDashMarks"></div>
+                        </div>
+                    </div>
+                </div>
 
-        <div id="dashboard" class="tab-content active">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Students</h3>
-                    <span id="totalStudents" class="stat-number">0</span>
+                
+                <div id="viewattendance" class="tab-content">
+                    <div class="section-header">
+                        <h2>View Attendance</h2>
+                        <div class="attendance-date">
+                            <label for="calendarStudentId">Student ID</label>
+                            <input type="text" id="calendarStudentId" placeholder="Enter your Student ID">
+                            <button class="btn btn-secondary" onclick="loadAttendanceCalendar()">Load</button>
+                        </div>
+                    </div>
+                    <div class="form-container">
+                        <div id="attendanceCalendar"></div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <h3>Today's Attendance</h3>
-                    <span id="todayAttendance" class="stat-number">0%</span>
-                </div>
-                <div class="stat-card">
-                    <h3>Average Attendance</h3>
-                    <span id="avgAttendance" class="stat-number">0%</span>
-                </div>
-                <div class="stat-card">
-                    <h3>Total Classes</h3>
-                    <span id="totalClasses" class="stat-number">0</span>
-                </div>
-            </div>
-            
-            <div class="recent-activity">
-                <h2>Recent Activity</h2>
-                <div id="recentActivity" class="activity-list">
-                    <p>No recent activity</p>
+                
+                <div id="admin" class="tab-content">
+                    <div class="section-header">
+                        <h2>Admin Panel</h2>
+                        <p>Manage classes and students</p>
+                    </div>
+                    <div class="form-container">
+                        <h3>Create Class</h3>
+                        <form onsubmit="createClassFromAdmin(event)">
+                            <div class="form-group">
+                                <label for="adminClassName">Class Name</label>
+                                <input type="text" id="adminClassName" required>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Create</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="students-list">
+                        <h3>Registered Students</h3>
+                        <div id="studentsTableAdmin" class="table-container"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -117,28 +178,46 @@
         <div id="attendance" class="tab-content">
             <div class="section-header">
                 <h2>Mark Attendance</h2>
-                <div class="attendance-date">
-                    <label for="attendanceDate">Date:</label>
-                    <input type="date" id="attendanceDate" required>
-                </div>
             </div>
-            
-            <div class="attendance-form">
-                <div class="class-selection">
-                    <label for="selectedClass">Select Class:</label>
-                    <select id="selectedClass" onchange="loadStudentsForAttendance()">
-                        <option value="">Select a class</option>
-                    </select>
-                </div>
-                
-                <div id="attendanceList" class="attendance-list" style="display: none;">
-                    <h3>Mark Attendance for <span id="className"></span></h3>
-                    <div id="studentsAttendanceList">
+            <div class="split-grid">
+                <div class="split-left">
+                    <div class="form-container">
+                        <div class="form-group">
+                            <label for="attendanceDate">Date:</label>
+                            <input type="date" id="attendanceDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="selectedClass">Select Class:</label>
+                            <select id="selectedClass" onchange="loadStudentsForAttendance()">
+                                <option value="">Select a class</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="attCsv">Upload Attendance CSV</label>
+                            <input type="file" id="attCsv" accept=".csv">
+                            <button class="btn btn-primary" style="margin-top:8px" onclick="uploadAttendanceCsv()">Upload CSV</button>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-secondary" onclick="loadStudentsForAttendance()">Load Students</button>
+                        </div>
                     </div>
-                    <div class="attendance-actions">
-                        <button class="btn btn-success" onclick="markAllPresent()">Mark All Present</button>
-                        <button class="btn btn-danger" onclick="markAllAbsent()">Mark All Absent</button>
-                        <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
+                </div>
+                <div class="split-right">
+                    <div id="attendanceList" class="attendance-list" style="display: none;">
+                        <h3>Mark Attendance for <span id="className"></span></h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr><th>Student</th><th>Present</th><th>Absent</th><th>Late</th></tr>
+                                </thead>
+                                <tbody id="studentsAttendanceList"></tbody>
+                            </table>
+                        </div>
+                        <div class="attendance-actions">
+                            <button class="btn btn-success" onclick="markAllPresent()">Mark All Present</button>
+                            <button class="btn btn-danger" onclick="markAllAbsent()">Mark All Absent</button>
+                            <button class="btn btn-primary" onclick="saveAttendance()">Save Attendance</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -246,16 +325,14 @@
                 <div class="auth-card">
                     <h3>Login</h3>
                     <form onsubmit="loginUser(event)">
-                        <div class="form-group">
-                            <label for="loginEmail">Email</label>
-                            <input type="email" id="loginEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="loginPassword">Password</label>
-                            <input type="password" id="loginPassword" required>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Login</button>
+                        <label for="loginEmail">Email</label>
+                        <input class="input" type="email" id="loginEmail" placeholder="email@example.com" required>
+                        <label style="margin-top:10px" for="loginPassword">Password</label>
+                        <input class="input" type="password" id="loginPassword" placeholder="Enter password" required>
+                        <div id="errorBox" class="error" style="display:none">Invalid email or password!</div>
+                        <div class="form-actions" style="justify-content:flex-start">
+                            <button type="submit" class="btn btn-submit">Login</button>
+                            <button type="button" class="btn btn-back" onclick="openRegister()">Create New Account</button>
                         </div>
                     </form>
                     <div id="authStatus" class="auth-status"></div>
@@ -264,33 +341,166 @@
                     </div>
                 </div>
 
-                <div class="auth-card">
+                <div class="auth-card" id="registerCard" style="display:none;">
                     <h3>Register</h3>
                     <form onsubmit="registerUser(event)">
-                        <div class="form-group">
-                            <label for="regName">Name</label>
-                            <input type="text" id="regName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regEmail">Email</label>
-                            <input type="email" id="regEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regPassword">Password</label>
-                            <input type="password" id="regPassword" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regRole">Role</label>
-                            <select id="regRole" required>
-                                <option value="student">Student</option>
-                                <option value="teacher">Teacher</option>
-                            </select>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Register</button>
+                        <label for="regName">Name</label>
+                        <input class="input" type="text" id="regName" placeholder="Your name" required>
+                        <label style="margin-top:10px" for="regEmail">Email</label>
+                        <input class="input" type="email" id="regEmail" placeholder="email@example.com" required>
+                        <label style="margin-top:10px" for="regPassword">Password</label>
+                        <input class="input" type="password" id="regPassword" placeholder="6+ character password" required>
+                        <label style="margin-top:10px" for="regRole">Select Role</label>
+                        <select class="input" id="regRole" required>
+                            <option value="student">Student</option>
+                            <option value="teacher">Teacher</option>
+                        </select>
+                        <div class="form-actions" style="justify-content:flex-start">
+                            <button type="submit" class="btn btn-submit">Register</button>
+                            <button type="button" class="btn btn-back" onclick="closeRegister()">Back to Login</button>
                         </div>
                     </form>
                 </div>
+            </div>
+        </div>
+
+        <div id="materials" class="tab-content">
+            <div class="section-header">
+                <h2>Materials</h2>
+            </div>
+            <div class="auth-grid">
+                <div class="auth-card">
+                    <h3>Upload Material (Teacher)</h3>
+                    <form onsubmit="addMaterial(event)">
+                        <div class="form-group">
+                            <label for="matTitle">Title</label>
+                            <input type="text" id="matTitle" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="materialFileInput">Choose File</label>
+                            <input type="file" id="materialFileInput">
+                        </div>
+                        <div class="form-group">
+                            <label for="matUrl">File URL</label>
+                            <input type="url" id="matUrl" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="matDesc">Description</label>
+                            <input type="text" id="matDesc">
+                        </div>
+                        <div class="form-group">
+                            <label for="matClass">Class ID (optional)</label>
+                            <input type="text" id="matClass">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="auth-card">
+                    <h3>Available Materials</h3>
+                    <div id="materialsList" class="table-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="marks" class="tab-content">
+            <div class="section-header">
+                <h2>Marks</h2>
+            </div>
+            <div class="auth-grid">
+                <div class="auth-card">
+                    <h3>Upload Marks (Teacher)</h3>
+                    <form onsubmit="addMark(event)">
+                        <div class="form-group">
+                            <label for="markStudentId">Student ID</label>
+                            <input type="text" id="markStudentId" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="markSubject">Subject</label>
+                            <input type="text" id="markSubject" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="markScore">Score</label>
+                            <input type="number" step="0.01" id="markScore" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="markMax">Max Score</label>
+                            <input type="number" step="0.01" id="markMax" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="marksCsv">Upload Marks CSV</label>
+                            <input type="file" id="marksCsv" accept=".csv">
+                            <button type="button" class="btn btn-primary" style="margin-top:8px" onclick="uploadMarksCsv()">Upload Marks CSV</button>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="auth-card">
+                    <h3>My Marks (Student)</h3>
+                    <div class="form-group">
+                        <label for="viewMarksStudentId">Student ID</label>
+                        <input type="text" id="viewMarksStudentId">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" onclick="loadMyMarks()">Load Marks</button>
+                    </div>
+                    <div id="marksList" class="table-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="complaints" class="tab-content">
+            <div class="section-header">
+                <h2>Raise a Complaint</h2>
+            </div>
+            <div class="split-grid">
+                <div class="split-left">
+                    <div class="form-container">
+                        <form onsubmit="submitComplaint(event)">
+                            <div class="form-group">
+                                <label for="complaintSubject">Subject</label>
+                                <input type="text" id="complaintSubject" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="complaintMessage">Description</label>
+                                <input type="text" id="complaintMessage" required>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary" style="width:100%">Submit</button>
+                            </div>
+                        </form>
+                        <h3 style="margin-top:16px;">My Complaints</h3>
+                        <div id="myComplaintsList" class="table-container"></div>
+                    </div>
+                </div>
+                <div class="split-right">
+                    <div class="section-header">
+                        <h2>Course Materials</h2>
+                    </div>
+                    <div id="materialsSlimList" class="table-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="myattendance" class="tab-content">
+            <div class="section-header">
+                <h2>My Attendance</h2>
+            </div>
+            <div class="auth-card">
+                <h3>Self Mark (24 hrs)</h3>
+                <form onsubmit="selfMarkAttendance(event)">
+                    <div class="form-group">
+                        <label for="selfStudentId">Student ID</label>
+                        <input type="text" id="selfStudentId" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Mark Present</button>
+                    </div>
+                </form>
+                <div id="selfMarkStatus" class="auth-status"></div>
             </div>
         </div>
     </div>

@@ -8,9 +8,9 @@ const apiBase = '';
 document.addEventListener('DOMContentLoaded', function() {
     applyTheme();
     initializeApp();
-    updateDashboard();
     updateStorageInfo();
     initializeAuthUI();
+    showTab(null, 'auth');
 });
 
 function initializeApp() {
@@ -42,15 +42,21 @@ function showTab(e, tabName) {
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(content => content.classList.remove('active'));
     
-    const tabButtons = document.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => button.classList.remove('active'));
+    const sideButtons = document.querySelectorAll('.side-link');
+    sideButtons.forEach(button => button.classList.remove('active'));
+    const topButtons = document.querySelectorAll('.top-link');
+    topButtons.forEach(button => button.classList.remove('active'));
     
     document.getElementById(tabName).classList.add('active');
     if (e && e.target) e.target.classList.add('active');
     
     switch(tabName) {
         case 'dashboard':
-            updateDashboard();
+            if (currentUser && currentUser.role === 'student') {
+                updateStudentDashboard();
+            } else {
+                updateDashboard();
+            }
             break;
         case 'students':
             loadClassesAndStudents();
@@ -66,6 +72,25 @@ function showTab(e, tabName) {
             break;
         case 'auth':
             // nothing special
+            break;
+        case 'materials':
+            loadMaterials();
+            break;
+        case 'marks':
+            break;
+        case 'complaints':
+            loadMyComplaints();
+            if (currentUser && (currentUser.role === 'teacher' || currentUser.role === 'admin')) {
+                loadAllComplaints();
+            }
+            loadMaterials().then(() => renderMaterialsInto('materialsSlimList')).catch(()=>{});
+            break;
+        case 'myattendance':
+            break;
+        case 'viewattendance':
+            break;
+        case 'admin':
+            renderStudentsAdmin();
             break;
     }
 }
@@ -96,18 +121,65 @@ let currentUser = null;
 function initializeAuthUI() {
     const status = document.getElementById('authStatus');
     const logoutActions = document.getElementById('logoutActions');
+    const sidebarUser = document.getElementById('sidebarUser');
+    closeRegister();
     if (!status || !logoutActions) return;
     if (currentUser) {
         status.textContent = `Logged in as ${currentUser.name} (${currentUser.role})`;
         logoutActions.style.display = 'flex';
+        if (sidebarUser) sidebarUser.textContent = `${currentUser.name}`;
+        gateNavByRole(currentUser.role);
+        const ht = document.getElementById('headerTitle');
+        const hs = document.getElementById('headerSubtitle');
+        if (ht) ht.textContent = currentUser.role === 'student' ? 'Student Dashboard' : 'Teacher Dashboard';
+        if (hs) hs.textContent = currentUser.role === 'student' ? 'Attendance • Marks • Complaints • Materials' : 'Upload attendance • marks • materials • complaints';
     } else {
         status.textContent = 'Not logged in';
         logoutActions.style.display = 'none';
+        if (sidebarUser) sidebarUser.textContent = 'Guest';
+        gateNavByRole(null);
+        const ht = document.getElementById('headerTitle');
+        const hs = document.getElementById('headerSubtitle');
+        if (ht) ht.textContent = 'Campus Attendance System';
+        if (hs) hs.textContent = 'Secure Login';
     }
 }
 
+function gateNavByRole(role) {
+    const all = ['tab-dashboard','tab-attendance','tab-viewattendance','tab-students','tab-materials','tab-marks','tab-complaints','tab-reports','tab-admin'];
+    all.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    const loginEl = document.getElementById('tab-auth');
+    const sidebar = document.querySelector('.sidebar');
+    const topNav = document.getElementById('studentTopNav');
+    if (loginEl) loginEl.style.display = role ? 'none' : 'block';
+    if (topNav) topNav.style.display = 'none';
+    if (!role) {
+        if (sidebar) sidebar.style.display = 'block';
+        return;
+    }
+    if (role === 'teacher' || role === 'admin') {
+        const allowed = ['tab-dashboard','tab-attendance','tab-students','tab-materials','tab-marks','tab-complaints','tab-reports','tab-admin'];
+        allowed.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'block'; });
+        if (sidebar) sidebar.style.display = 'block';
+    } else if (role === 'student') {
+        const allowed = ['tab-dashboard','tab-viewattendance','tab-marks','tab-materials','tab-complaints'];
+        allowed.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'block'; });
+        if (sidebar) sidebar.style.display = 'block';
+    }
+}
+
+function openRegister() {
+    const reg = document.getElementById('registerCard');
+    if (reg) reg.style.display = 'block';
+}
+
+function closeRegister() {
+    const reg = document.getElementById('registerCard');
+    if (reg) reg.style.display = 'none';
+}
+
 async function registerUser(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value.trim();
@@ -135,28 +207,60 @@ async function loginUser(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
+    const errorBox = document.getElementById('errorBox');
     try {
         const data = await fetchJSON('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
         apiToken = data.token;
         currentUser = data.user;
         localStorage.setItem('ams_token', apiToken);
+        if (errorBox) errorBox.style.display = 'none';
+        if (currentUser.role === 'teacher' || currentUser.role === 'admin') {
+            localStorage.setItem('ams_theme', 'dark');
+        } else {
+            localStorage.setItem('ams_theme', 'light');
+        }
+        applyTheme();
         showMessage(`Welcome ${currentUser.name}!`, 'success');
         await loadClassesAndStudents();
     } catch (err) {
         showMessage(err.message, 'error');
+        if (errorBox) errorBox.style.display = 'block';
         return;
     }
     initializeAuthUI();
+    if (currentUser.role === 'student') {
+        showTab(null, 'viewattendance');
+    } else {
+        showTab(null, 'dashboard');
+    }
 
     // Optional: gate features
     const studentsTabBtn = document.getElementById('tab-students');
     const attendanceTabBtn = document.getElementById('tab-attendance');
+    const materialsTabBtn = document.getElementById('tab-materials');
+    const marksTabBtn = document.getElementById('tab-marks');
+    const complaintsTabBtn = document.getElementById('tab-complaints');
+    const myAttendanceTabBtn = document.getElementById('tab-myattendance');
+    const viewAttendanceTabBtn = document.getElementById('tab-viewattendance');
+    const adminTabBtn = document.getElementById('tab-admin');
     if (currentUser.role === 'teacher' || currentUser.role === 'admin') {
         studentsTabBtn.disabled = false;
         attendanceTabBtn.disabled = false;
+        materialsTabBtn.disabled = false;
+        marksTabBtn.disabled = false;
+        complaintsTabBtn.disabled = false;
+        myAttendanceTabBtn.disabled = true;
+        viewAttendanceTabBtn.disabled = false;
+        adminTabBtn.disabled = false;
     } else {
-        studentsTabBtn.disabled = false; // allow viewing
-        attendanceTabBtn.disabled = true; // prevent marking attendance
+        studentsTabBtn.disabled = false;
+        attendanceTabBtn.disabled = true;
+        materialsTabBtn.disabled = false;
+        marksTabBtn.disabled = false;
+        complaintsTabBtn.disabled = false;
+        myAttendanceTabBtn.disabled = false;
+        viewAttendanceTabBtn.disabled = false;
+        adminTabBtn.disabled = true;
     }
 }
 
@@ -212,8 +316,7 @@ function calculateAverageAttendance() {
 function calculateStudentAttendancePercentage(student) {
     const attendanceValues = Object.values(student.attendance);
     if (attendanceValues.length === 0) return 0;
-    
-    const presentCount = attendanceValues.filter(present => present).length;
+    const presentCount = attendanceValues.filter(v => v === true || v === 'present').length;
     return (presentCount / attendanceValues.length) * 100;
 }
 
@@ -382,36 +485,30 @@ async function loadStudentsForAttendance() {
     
     document.getElementById('className').textContent = selectedClass;
     const studentsList = document.getElementById('studentsAttendanceList');
-    
+    const date = document.getElementById('attendanceDate').value;
     studentsList.innerHTML = classStudents.map(student => {
-        const date = document.getElementById('attendanceDate').value;
-        const isPresent = student.attendance[date] === true;
-        
+        const val = student.attendance[date];
+        const current = typeof val === 'string' ? val : (val === true ? 'present' : (val === false ? 'absent' : ''));
         return `
-            <div class="student-attendance-item">
-                <input type="checkbox" 
-                       id="att_${student.studentId}" 
-                       ${isPresent ? 'checked' : ''} 
-                       onchange="updateAttendanceStatus('${student.studentId}', this.checked)">
-                <div class="student-info">
-                    <div class="student-name">${student.name}</div>
-                    <div class="student-id">${student.studentId}</div>
-                </div>
-            </div>
+            <tr>
+                <td>${student.name} <div style="color:#666;font-size:0.85rem;">${student.studentId}</div></td>
+                <td><input type="radio" name="att_${student.studentId}" ${current==='present'?'checked':''} onchange="setAttendanceStatus('${student.studentId}','present')"></td>
+                <td><input type="radio" name="att_${student.studentId}" ${current==='absent'?'checked':''} onchange="setAttendanceStatus('${student.studentId}','absent')"></td>
+                <td><input type="radio" name="att_${student.studentId}" ${current==='late'?'checked':''} onchange="setAttendanceStatus('${student.studentId}','late')"></td>
+            </tr>
         `;
     }).join('');
     
     attendanceList.style.display = 'block';
 }
 
-async function updateAttendanceStatus(studentId, isPresent) {
+async function setAttendanceStatus(studentId, status) {
     const date = document.getElementById('attendanceDate').value;
     const student = students.find(s => s.studentId === studentId);
     if (!student || !currentSession) return;
     try {
-        const status = isPresent ? 'present' : 'absent';
         await fetchJSON('/api/attendance/mark', { method: 'POST', body: JSON.stringify({ sessionId: currentSession.id, studentId: student._backendId, status }) });
-        student.attendance[date] = isPresent;
+        student.attendance[date] = status;
         saveDataToStorage();
     } catch (err) {
         showMessage(err.message, 'error');
@@ -419,21 +516,17 @@ async function updateAttendanceStatus(studentId, isPresent) {
 }
 
 function markAllPresent() {
-    const checkboxes = document.querySelectorAll('#studentsAttendanceList input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = true;
-        const studentId = checkbox.id.replace('att_', '');
-        updateAttendanceStatus(studentId, true);
-    });
+    const radios = document.querySelectorAll('#studentsAttendanceList input[type="radio"]');
+    const ids = new Set();
+    radios.forEach(r => { const name = r.name; const id = name.replace('att_',''); ids.add(id); });
+    ids.forEach(id => setAttendanceStatus(id, 'present'));
 }
 
 function markAllAbsent() {
-    const checkboxes = document.querySelectorAll('#studentsAttendanceList input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = false;
-        const studentId = checkbox.id.replace('att_', '');
-        updateAttendanceStatus(studentId, false);
-    });
+    const radios = document.querySelectorAll('#studentsAttendanceList input[type="radio"]');
+    const ids = new Set();
+    radios.forEach(r => { const name = r.name; const id = name.replace('att_',''); ids.add(id); });
+    ids.forEach(id => setAttendanceStatus(id, 'absent'));
 }
 
 async function saveAttendance() {
@@ -966,6 +1059,10 @@ function updateStorageInfo() {
 // Backend sync helpers
 let classes = [];
 let currentSession = null;
+let materials = [];
+let marks = [];
+let complaintsMine = [];
+let complaintsAll = [];
 
 async function loadClassesAndStudents() {
     if (!apiToken) {
@@ -1023,4 +1120,352 @@ async function ensureSession(classId, date) {
 
 async function createClass(name) {
     await fetchJSON('/api/classes', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+function renderStudentsAdmin() {
+    const el = document.getElementById('studentsTableAdmin');
+    if (!el) return;
+    const rows = students.map(s => `<tr><td>${s.studentId}</td><td>${s.name}</td><td>${s.email}</td><td>${s.className}</td></tr>`).join('');
+    el.innerHTML = `<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Class</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function createClassFromAdmin(e) {
+    e.preventDefault();
+    const name = document.getElementById('adminClassName').value.trim();
+    if (!name) return;
+    try {
+        await createClass(name);
+        document.getElementById('adminClassName').value = '';
+        showMessage('Class created', 'success');
+        await loadClassesAndStudents();
+        renderStudentsAdmin();
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function loadAttendanceCalendar() {
+    const extIdInput = document.getElementById('calendarStudentId');
+    let extId = (extIdInput && extIdInput.value.trim()) || '';
+    if (!extId) extId = getMyStudentId();
+    if (!extId) { showMessage('Enter Student ID', 'error'); return; }
+    try {
+        const data = await fetchJSON(`/api/attendance/student/${encodeURIComponent(extId)}`);
+        renderAttendanceCalendar(data);
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+function renderAttendanceCalendar(rows) {
+    const cal = document.getElementById('attendanceCalendar');
+    if (!cal) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const first = new Date(year, month, 1);
+    const startDay = first.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const byDate = new Map();
+    rows.forEach(r => { byDate.set(r.date, r.status || ''); });
+    const cells = [];
+    for (let i=0;i<startDay;i++) cells.push('<div class="day"></div>');
+    for (let d=1; d<=daysInMonth; d++) {
+        const dateStr = new Date(year, month, d).toISOString().split('T')[0];
+        const status = byDate.get(dateStr) || '';
+        const cls = status ? status : '';
+        cells.push(`<div class="day ${cls}"><div>${d}</div>${status?`<div style='font-size:0.8rem;color:#666;'>${status}</div>`:''}</div>`);
+    }
+    cal.innerHTML = `<div class="calendar">${cells.join('')}</div>`;
+}
+
+async function loadMaterials() {
+    try {
+        materials = await fetchJSON('/api/materials');
+        renderMaterials();
+    } catch (e) {}
+}
+
+function renderMaterials() {
+    const listEl = document.getElementById('materialsList');
+    if (!listEl) return;
+    if (!materials || materials.length === 0) {
+        listEl.innerHTML = '<p>No materials</p>';
+        return;
+    }
+    const rows = materials.map(m => `<tr><td>${m.title}</td><td>${m.description || ''}</td><td><a href="${m.url}" target="_blank">Download</a></td><td>${m.class_id || ''}</td></tr>`).join('');
+    listEl.innerHTML = `<table><thead><tr><th>Title</th><th>Description</th><th>Link</th><th>Class</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderMaterialsInto(targetId) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    if (!materials || materials.length === 0) { el.innerHTML = '<p>No materials</p>'; return; }
+    const rows = materials.map(m => `<tr><td style="display:flex;gap:8px;align-items:center"><span>📄</span><span>${m.title}</span></td><td style="text-align:right"><a class="btn btn-primary" href="${m.url}" target="_blank">Download</a></td></tr>`).join('');
+    el.innerHTML = `<table><thead><tr><th>File</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function addMaterial(e) {
+    e.preventDefault();
+    if (!currentUser || (currentUser.role !== 'teacher' && currentUser.role !== 'admin')) { showMessage('Not allowed', 'error'); return; }
+    const title = document.getElementById('matTitle').value.trim();
+    const url = document.getElementById('matUrl').value.trim();
+    const description = document.getElementById('matDesc').value.trim();
+    const classIdStr = document.getElementById('matClass').value.trim();
+    const classId = classIdStr ? Number(classIdStr) : null;
+    if (!title || !url) { showMessage('Please fill required fields.', 'error'); return; }
+    try {
+        await fetchJSON('/api/materials', { method: 'POST', body: JSON.stringify({ title, url, description, classId }) });
+        document.getElementById('matTitle').value = '';
+        document.getElementById('matUrl').value = '';
+        document.getElementById('matDesc').value = '';
+        document.getElementById('matClass').value = '';
+        showMessage('Material uploaded', 'success');
+        await loadMaterials();
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function addMark(e) {
+    e.preventDefault();
+    if (!currentUser || (currentUser.role !== 'teacher' && currentUser.role !== 'admin')) { showMessage('Not allowed', 'error'); return; }
+    const studentExtId = document.getElementById('markStudentId').value.trim();
+    const subject = document.getElementById('markSubject').value.trim();
+    const score = document.getElementById('markScore').value.trim();
+    const maxScore = document.getElementById('markMax').value.trim();
+    if (!studentExtId || !subject || !score || !maxScore) { showMessage('Please fill all fields.', 'error'); return; }
+    try {
+        await fetchJSON('/api/marks', { method: 'POST', body: JSON.stringify({ studentExtId, subject, score, maxScore }) });
+        showMessage('Mark uploaded', 'success');
+        document.getElementById('markStudentId').value = '';
+        document.getElementById('markSubject').value = '';
+        document.getElementById('markScore').value = '';
+        document.getElementById('markMax').value = '';
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function loadMyMarks() {
+    const extId = document.getElementById('viewMarksStudentId').value.trim();
+    if (!extId) { showMessage('Enter Student ID', 'error'); return; }
+    try {
+        marks = await fetchJSON(`/api/marks/student/${encodeURIComponent(extId)}`);
+        renderMarks();
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+function getMyStudentId() {
+    return localStorage.getItem('ams_student_id') || '';
+}
+
+function saveMyIdFromDashboard() {
+    const id = document.getElementById('dashStudentId').value.trim();
+    if (!id) { showMessage('Enter Student ID', 'error'); return; }
+    localStorage.setItem('ams_student_id', id);
+    showMessage('Saved Student ID', 'success');
+    updateStudentDashboard();
+}
+
+async function updateStudentDashboard() {
+    const id = getMyStudentId();
+    const input = document.getElementById('dashStudentId');
+    if (input) input.value = id;
+    if (!id) return;
+    try {
+        const rows = await fetchJSON(`/api/attendance/student/${encodeURIComponent(id)}`);
+        renderAttendanceCalendarInto(rows, 'studentDashCalendar', 'studentDashPercent');
+        renderAttendanceRecordsInto(rows, 'studentAttendanceRecords');
+        marks = await fetchJSON(`/api/marks/student/${encodeURIComponent(id)}`);
+        renderMarksInto('studentDashMarks');
+    } catch (err) { /* ignore */ }
+}
+
+function renderAttendanceCalendarInto(rows, containerId, percentId) {
+    const cal = document.getElementById(containerId);
+    if (!cal) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const first = new Date(year, month, 1);
+    const startDay = first.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const byDate = new Map();
+    rows.forEach(r => { if (r.date) byDate.set(r.date, r.status || ''); });
+    const cells = [];
+    let presentCount = 0;
+    let totalCount = 0;
+    for (let i=0;i<startDay;i++) cells.push('<div class="day"></div>');
+    for (let d=1; d<=daysInMonth; d++) {
+        const dateStr = new Date(year, month, d).toISOString().split('T')[0];
+        const status = byDate.get(dateStr) || '';
+        if (status) { totalCount++; if (status==='present') presentCount++; }
+        const cls = status ? status : '';
+        cells.push(`<div class="day ${cls}"><div>${d}</div>${status?`<div style='font-size:0.8rem;color:#666;'>${status}</div>`:''}</div>`);
+    }
+    cal.innerHTML = `<div class="card"><div class="calendar">${cells.join('')}</div></div>`;
+    const pct = document.getElementById(percentId);
+    if (pct) pct.textContent = totalCount? Math.round((presentCount/totalCount)*100)+'%':'0%';
+}
+
+function renderMarksInto(targetId) {
+    const listEl = document.getElementById(targetId);
+    if (!listEl) return;
+    if (!marks || marks.length === 0) { listEl.innerHTML = '<div class="card"><p>No marks</p></div>'; return; }
+    const rows = marks.map(m => `<tr><td>${m.subject}</td><td>${m.score}/${m.max_score}</td><td>${new Date(m.created_at).toLocaleDateString()}</td><td>${gradeFromScore(m.score, m.max_score)}</td></tr>`).join('');
+    listEl.innerHTML = `<div class="card"><table><thead><tr><th>Subject</th><th>Score</th><th>Date</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function gradeFromScore(score, max) {
+    const pct = (Number(score)/Number(max))*100;
+    if (pct>=85) return 'A';
+    if (pct>=75) return 'B';
+    if (pct>=65) return 'C';
+    return 'D';
+}
+
+function renderMarks() {
+    const listEl = document.getElementById('marksList');
+    if (!listEl) return;
+    if (!marks || marks.length === 0) { listEl.innerHTML = '<p>No marks</p>'; return; }
+    const rows = marks.map(m => `<tr><td>${m.subject}</td><td>${m.score}</td><td>${m.max_score}</td><td>${new Date(m.created_at).toLocaleString()}</td></tr>`).join('');
+    listEl.innerHTML = `<table><thead><tr><th>Subject</th><th>Score</th><th>Max</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function uploadAttendanceCsv() {
+  const file = document.getElementById('attCsv') && document.getElementById('attCsv').files[0];
+  if (!file) { showMessage('Select a CSV file.', 'error'); return; }
+  try {
+    const text = await file.text();
+    const rows = parseCsv(text);
+    for (const r of rows) {
+      const classId = Number(r.classId || r.class_id || '');
+      const date = r.date;
+      const studentExtId = r.studentExtId || r.student_id || r.studentId;
+      const status = (r.status || 'present').toLowerCase();
+      if (!classId || !date || !studentExtId) continue;
+      const session = await ensureSession(classId, date);
+      const st = students.find(s => s.studentId === studentExtId);
+      if (!st || !st._backendId) continue;
+      await fetchJSON('/api/attendance/mark', { method: 'POST', body: JSON.stringify({ sessionId: session.id, studentId: st._backendId, status }) });
+    }
+    showMessage('CSV uploaded', 'success');
+  } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function uploadMarksCsv() {
+  const file = document.getElementById('marksCsv') && document.getElementById('marksCsv').files[0];
+  if (!file) { showMessage('Select a CSV file.', 'error'); return; }
+  try {
+    const text = await file.text();
+    const rows = parseCsv(text);
+    for (const r of rows) {
+      const studentExtId = r.studentExtId || r.student_id || r.studentId;
+      const subject = r.subject;
+      const score = r.score;
+      const maxScore = r.maxScore || r.max_score;
+      if (!studentExtId || !subject || score === undefined || maxScore === undefined) continue;
+      await fetchJSON('/api/marks', { method: 'POST', body: JSON.stringify({ studentExtId, subject, score, maxScore }) });
+    }
+    showMessage('Marks CSV uploaded', 'success');
+  } catch (err) { showMessage(err.message, 'error'); }
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i=1;i<lines.length;i++) {
+    const cols = lines[i].split(',');
+    const obj = {};
+    headers.forEach((h,idx) => { obj[h] = (cols[idx]||'').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+async function ensureSession(classId, date) {
+  const qs = new URLSearchParams({ classId: String(classId), date });
+  const existing = await fetchJSON(`/api/sessions?${qs.toString()}`);
+  if (Array.isArray(existing) && existing.length > 0) return existing[0];
+  const now = new Date().toISOString();
+  const created = await fetchJSON('/api/sessions', { method: 'POST', body: JSON.stringify({ classId, date, status: 'open', startTime: now, endTime: now }) });
+  return created;
+}
+
+function renderAttendanceRecordsInto(rows, targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  if (!rows || rows.length === 0) { el.innerHTML = '<div class="card"><p>No records</p></div>'; return; }
+  const sorted = rows.filter(r => r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-10);
+  const trs = sorted.map(r => `<tr><td>${r.date}</td><td>${r.status||''}</td></tr>`).join('');
+  el.innerHTML = `<div class="card"><h3 style="margin:0 0 8px 0">Attendance Records</h3><table><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+async function submitComplaint(e) {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== 'student') { showMessage('Not allowed', 'error'); return; }
+    const subject = document.getElementById('complaintSubject').value.trim();
+    const message = document.getElementById('complaintMessage').value.trim();
+    if (!subject || !message) { showMessage('Please fill all fields.', 'error'); return; }
+    try {
+        await fetchJSON('/api/complaints', { method: 'POST', body: JSON.stringify({ subject, message }) });
+        document.getElementById('complaintSubject').value = '';
+        document.getElementById('complaintMessage').value = '';
+        showMessage('Complaint submitted', 'success');
+        await loadMyComplaints();
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function loadMyComplaints() {
+    if (!currentUser || currentUser.role !== 'student') { document.getElementById('myComplaintsList').innerHTML = '<p>Login as student</p>'; return; }
+    try {
+        complaintsMine = await fetchJSON('/api/complaints/my');
+        renderMyComplaints();
+    } catch (e) {}
+}
+
+function renderMyComplaints() {
+    const el = document.getElementById('myComplaintsList');
+    if (!el) return;
+    if (!complaintsMine || complaintsMine.length === 0) { el.innerHTML = '<p>No complaints</p>'; return; }
+    const rows = complaintsMine.map(c => `<tr><td>${c.subject}</td><td>${c.message}</td><td>${c.status}</td><td>${c.response_text || ''}</td></tr>`).join('');
+    el.innerHTML = `<table><thead><tr><th>Subject</th><th>Message</th><th>Status</th><th>Response</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function loadAllComplaints() {
+    if (!currentUser || (currentUser.role !== 'teacher' && currentUser.role !== 'admin')) { document.getElementById('allComplaintsList').innerHTML = '<p>Login as teacher</p>'; return; }
+    try {
+        complaintsAll = await fetchJSON('/api/complaints');
+        renderAllComplaints();
+    } catch (e) {}
+}
+
+function renderAllComplaints() {
+    const el = document.getElementById('allComplaintsList');
+    if (!el) return;
+    if (!complaintsAll || complaintsAll.length === 0) { el.innerHTML = '<p>No complaints</p>'; return; }
+    const rows = complaintsAll.map(c => `<tr><td>${c.id}</td><td>${c.subject}</td><td>${c.message}</td><td>${c.status}</td><td><input type="text" id="resp_${c.id}" placeholder="Response"><button class="btn btn-primary" onclick="respondComplaint(${c.id})">Update</button></td></tr>`).join('');
+    el.innerHTML = `<table><thead><tr><th>ID</th><th>Subject</th><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function respondComplaint(id) {
+    if (!currentUser || (currentUser.role !== 'teacher' && currentUser.role !== 'admin')) { showMessage('Not allowed', 'error'); return; }
+    const resp = document.getElementById(`resp_${id}`).value.trim();
+    try {
+        await fetchJSON(`/api/complaints/${id}`, { method: 'PATCH', body: JSON.stringify({ responseText: resp, status: 'resolved' }) });
+        showMessage('Updated', 'success');
+        await loadAllComplaints();
+        await loadMyComplaints();
+    } catch (err) { showMessage(err.message, 'error'); }
+}
+
+async function selfMarkAttendance(e) {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== 'student') { showMessage('Not allowed', 'error'); return; }
+    const extId = document.getElementById('selfStudentId').value.trim();
+    if (!extId) { showMessage('Enter Student ID', 'error'); return; }
+    const statusEl = document.getElementById('selfMarkStatus');
+    try {
+        await fetchJSON('/api/attendance/self-mark', { method: 'POST', body: JSON.stringify({ studentExtId: extId }) });
+        statusEl.textContent = 'Marked successfully';
+        showMessage('Attendance marked', 'success');
+    } catch (err) {
+        statusEl.textContent = err.message;
+        showMessage(err.message, 'error');
+    }
 }
