@@ -635,3 +635,59 @@ table tr:hover {
     font-size: 0.95rem;
     color: rgb(102, 102, 102);
 }
+
+body.dark {
+    background: linear-gradient(135deg, #232526 0%, #414345 100%);
+    color: rgb(230, 230, 230);
+}
+
+body.dark .container {
+    background: rgba(18, 18, 18, 0.95);
+}
+
+body.dark header {
+    background: linear-gradient(45deg, rgb(33, 33, 33), rgb(55, 55, 55));
+    color: white;
+}
+
+body.dark .tabs {
+    background: rgb(30, 30, 30);
+}
+
+body.dark .tab-button {
+    color: rgb(200, 200, 200);
+}
+
+body.dark .tab-button:hover {
+    background: rgba(76, 175, 80, 0.15);
+    color: white;
+}
+
+body.dark .stat-card,
+body.dark .recent-activity,
+body.dark .form-container,
+body.dark .attendance-form,
+body.dark .report-card,
+body.dark .data-card,
+body.dark .table-container {
+    background: rgb(24, 24, 24);
+    color: rgb(220, 220, 220);
+}
+
+body.dark table th {
+    background: rgb(40, 40, 40);
+    color: rgb(220, 220, 220);
+}
+
+body.dark table td {
+    border-bottom: 1px solid rgb(60, 60, 60);
+}
+
+body.dark .report-content {
+    background: rgb(30, 30, 30);
+}
+
+body.dark .footer {
+    background: rgb(30, 30, 30);
+    border-top: 1px solid rgb(60, 60, 60);
+}

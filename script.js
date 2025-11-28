@@ -2,10 +2,12 @@
 let students = [];
 let currentAttendance = {};
 let attendanceManager = null;
+let apiToken = null;
+const apiBase = '';
 
 document.addEventListener('DOMContentLoaded', function() {
+    applyTheme();
     initializeApp();
-    loadSampleData();
     updateDashboard();
     updateStorageInfo();
     initializeAuthUI();
@@ -24,57 +26,19 @@ function initializeApp() {
     updateStudentDropdowns();
 }
 
-function loadSampleData() {
-    const savedStudents = localStorage.getItem('attendanceStudents');
-    if (!savedStudents && students.length === 0) {
-        const sampleStudents = [
-            {
-                studentId: '22BCE7177',
-                name: 'ABHIRAM',
-                email: 'abhiram@email.com',
-                className: '7th semester',
-                attendance: {}
-            },
-            {
-                studentId: '22BCE20458',
-                name: 'Greeshma',
-                email: 'greeshma@email.com',
-                className: '7th semester',
-                attendance: {}
-            },
-            {
-                studentId: '22BCE9625',
-                name: 'Sarath',
-                email: 'sarath@email.com',
-                className: '7th semester',
-                attendance: {}
-            },
-            {
-                studentId: '22BCE8382',
-                name: 'Vamsi',
-                email: 'vamsi@email.com',
-                className: '7th semester',
-                attendance: {}
-            },
-            {
-                studentId: '22BCE7914',
-                name: 'satish',
-                email: 'satish@email.com',
-                className: '7th semester',
-                attendance: {}
-            }
-        ];
-        
-        students = sampleStudents;
-        saveDataToStorage();
-        updateDashboard();
-        updateClassDropdowns();
-        updateStudentDropdowns();
-        updateStudentsTable();
+async function fetchJSON(url, opts = {}) {
+    const headers = opts.headers || {};
+    if (apiToken) headers['Authorization'] = 'Bearer ' + apiToken;
+    headers['Content-Type'] = 'application/json';
+    const res = await fetch(apiBase + url, { ...opts, headers });
+    if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(e.error || 'Request failed');
     }
+    return res.json();
 }
 
-function showTab(tabName) {
+function showTab(e, tabName) {
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(content => content.classList.remove('active'));
     
@@ -82,18 +46,17 @@ function showTab(tabName) {
     tabButtons.forEach(button => button.classList.remove('active'));
     
     document.getElementById(tabName).classList.add('active');
-    
-    event.target.classList.add('active');
+    if (e && e.target) e.target.classList.add('active');
     
     switch(tabName) {
         case 'dashboard':
             updateDashboard();
             break;
         case 'students':
-            updateStudentsTable();
+            loadClassesAndStudents();
             break;
         case 'attendance':
-            // Update attendance tab if needed
+            loadClassesAndStudents();
             break;
         case 'reports':
             updateReportDropdowns();
@@ -107,7 +70,27 @@ function showTab(tabName) {
     }
 }
 
-// --- Auth (local-only demo) ---
+function toggleTheme() {
+    const current = localStorage.getItem('ams_theme') || 'light';
+    const next = current === 'light' ? 'dark' : 'light';
+    localStorage.setItem('ams_theme', next);
+    applyTheme();
+}
+
+function applyTheme() {
+    const theme = localStorage.getItem('ams_theme') || 'light';
+    if (theme === 'dark') {
+        document.body.classList.add('dark');
+        const t = document.getElementById('themeToggle');
+        if (t) t.textContent = 'Light Theme';
+    } else {
+        document.body.classList.remove('dark');
+        const t = document.getElementById('themeToggle');
+        if (t) t.textContent = 'Toggle Theme';
+    }
+}
+
+// --- Auth (backend) ---
 let currentUser = null;
 
 function initializeAuthUI() {
@@ -123,7 +106,7 @@ function initializeAuthUI() {
     }
 }
 
-function registerUser(e) {
+async function registerUser(e) {
     e.preventDefault();
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
@@ -135,39 +118,40 @@ function registerUser(e) {
         return;
     }
 
-    const users = JSON.parse(localStorage.getItem('ams_users') || '[]');
-    if (users.find(u => u.email === email)) {
-        showMessage('Email already registered.', 'error');
+    try {
+        await fetchJSON('/api/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
+        showMessage('Registration successful! You can now login.', 'success');
+    } catch (err) {
+        showMessage(err.message, 'error');
         return;
     }
-
-    users.push({ name, email, password, role });
-    localStorage.setItem('ams_users', JSON.stringify(users));
-    showMessage('Registration successful! You can now login.', 'success');
     document.getElementById('regName').value = '';
     document.getElementById('regEmail').value = '';
     document.getElementById('regPassword').value = '';
     document.getElementById('regRole').value = 'student';
 }
 
-function loginUser(e) {
+async function loginUser(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
-    const users = JSON.parse(localStorage.getItem('ams_users') || '[]');
-    const user = users.find(u => u.email === email && u.password === password);
-    if (!user) {
-        showMessage('Invalid email or password.', 'error');
+    try {
+        const data = await fetchJSON('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        apiToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem('ams_token', apiToken);
+        showMessage(`Welcome ${currentUser.name}!`, 'success');
+        await loadClassesAndStudents();
+    } catch (err) {
+        showMessage(err.message, 'error');
         return;
     }
-    currentUser = user;
-    showMessage(`Welcome ${user.name}!`, 'success');
     initializeAuthUI();
 
     // Optional: gate features
     const studentsTabBtn = document.getElementById('tab-students');
     const attendanceTabBtn = document.getElementById('tab-attendance');
-    if (user.role === 'teacher') {
+    if (currentUser.role === 'teacher' || currentUser.role === 'admin') {
         studentsTabBtn.disabled = false;
         attendanceTabBtn.disabled = false;
     } else {
@@ -178,6 +162,8 @@ function loginUser(e) {
 
 function logoutUser() {
     currentUser = null;
+    apiToken = null;
+    localStorage.removeItem('ams_token');
     initializeAuthUI();
     showMessage('Logged out.', 'success');
 }
@@ -289,7 +275,7 @@ function hideAddStudentForm() {
     document.getElementById('addStudentForm').reset();
 }
 
-function addStudent(event) {
+async function addStudent(event) {
     event.preventDefault();
     
     const studentId = document.getElementById('studentId').value.trim();
@@ -307,34 +293,31 @@ function addStudent(event) {
         return;
     }
     
-    const newStudent = {
-        studentId: studentId,
-        name: name,
-        email: email,
-        className: className,
-        attendance: {}
-    };
-    
-    students.push(newStudent);
-    saveDataToStorage();
-    
-    showMessage('Student added successfully!', 'success');
-    hideAddStudentForm();
-    updateStudentsTable();
-    updateClassDropdowns();
-    updateStudentDropdowns();
-    updateDashboard();
+    try {
+        const classObj = classes.find(c => c.name === className);
+        if (!classObj) {
+            await createClass(className);
+        }
+        const targetClass = classes.find(c => c.name === className);
+        await fetchJSON(`/api/classes/${targetClass.id}/students`, { method: 'POST', body: JSON.stringify({ studentId, name, email }) });
+        showMessage('Student added successfully!', 'success');
+        hideAddStudentForm();
+        await loadClassesAndStudents();
+        updateDashboard();
+    } catch (err) {
+        showMessage(err.message, 'error');
+    }
 }
 
 function updateStudentsTable() {
     const tbody = document.getElementById('studentsTableBody');
-    
-    if (students.length === 0) {
+    const list = getFilteredStudents();
+    if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No students found</td></tr>';
         return;
     }
     
-    tbody.innerHTML = students.map(student => {
+    tbody.innerHTML = list.map(student => {
         const attendancePercentage = calculateStudentAttendancePercentage(student);
         return `
             <tr>
@@ -344,26 +327,43 @@ function updateStudentsTable() {
                 <td>${student.className}</td>
                 <td>${attendancePercentage.toFixed(1)}%</td>
                 <td>
-                    <button class="btn btn-danger" onclick="removeStudent('${student.studentId}')">Remove</button>
+                    <button class="btn btn-danger" onclick="removeStudent('${student._backendId || ''}')">Remove</button>
                 </td>
             </tr>
         `;
     }).join('');
 }
 
-function removeStudent(studentId) {
+function getFilteredStudents() {
+    const input = document.getElementById('studentSearch');
+    const q = input ? input.value.toLowerCase().trim() : '';
+    if (!q) return students;
+    return students.filter(s => {
+        return [s.studentId, s.name, s.email, s.className]
+            .map(v => (v || '').toLowerCase())
+            .some(v => v.includes(q));
+    });
+}
+
+function filterStudentsTable() {
+    updateStudentsTable();
+}
+
+async function removeStudent(backendId) {
+    if (!backendId) return;
     if (confirm('Are you sure you want to remove this student?')) {
-        students = students.filter(s => s.studentId !== studentId);
-        saveDataToStorage();
-        updateStudentsTable();
-        updateClassDropdowns();
-        updateStudentDropdowns();
-        updateDashboard();
-        showMessage('Student removed successfully!', 'success');
+        try {
+            await fetchJSON(`/api/students/${backendId}`, { method: 'DELETE' });
+            await loadClassesAndStudents();
+            updateDashboard();
+            showMessage('Student removed successfully!', 'success');
+        } catch (err) {
+            showMessage(err.message, 'error');
+        }
     }
 }
 
-function loadStudentsForAttendance() {
+async function loadStudentsForAttendance() {
     const selectedClass = document.getElementById('selectedClass').value;
     const attendanceList = document.getElementById('attendanceList');
     
@@ -404,13 +404,17 @@ function loadStudentsForAttendance() {
     attendanceList.style.display = 'block';
 }
 
-function updateAttendanceStatus(studentId, isPresent) {
+async function updateAttendanceStatus(studentId, isPresent) {
     const date = document.getElementById('attendanceDate').value;
     const student = students.find(s => s.studentId === studentId);
-    
-    if (student) {
+    if (!student || !currentSession) return;
+    try {
+        const status = isPresent ? 'present' : 'absent';
+        await fetchJSON('/api/attendance/mark', { method: 'POST', body: JSON.stringify({ sessionId: currentSession.id, studentId: student._backendId, status }) });
         student.attendance[date] = isPresent;
         saveDataToStorage();
+    } catch (err) {
+        showMessage(err.message, 'error');
     }
 }
 
@@ -432,9 +436,16 @@ function markAllAbsent() {
     });
 }
 
-function saveAttendance() {
-    showMessage('Attendance saved successfully!', 'success');
-    updateDashboard();
+async function saveAttendance() {
+    try {
+        if (currentSession) {
+            await fetchJSON(`/api/sessions/${currentSession.id}/finalize`, { method: 'POST' });
+        }
+        showMessage('Attendance saved and session finalized!', 'success');
+        updateDashboard();
+    } catch (err) {
+        showMessage(err.message, 'error');
+    }
 }
 
 function updateReportDropdowns() {
@@ -503,6 +514,8 @@ function generateIndividualReport() {
     
     document.getElementById('individualReport').innerHTML = report;
     document.getElementById('downloadIndividualBtn').style.display = 'inline-block';
+    const csvBtn = document.getElementById('downloadIndividualCsvBtn');
+    if (csvBtn) csvBtn.style.display = 'inline-block';
 }
 
 function generateClassReport() {
@@ -540,6 +553,8 @@ function generateClassReport() {
     
     document.getElementById('classReportContent').innerHTML = report;
     document.getElementById('downloadClassBtn').style.display = 'inline-block';
+    const csvBtn = document.getElementById('downloadClassCsvBtn');
+    if (csvBtn) csvBtn.style.display = 'inline-block';
 }
 
 function generateOverallStats() {
@@ -570,6 +585,8 @@ function generateOverallStats() {
     
     document.getElementById('overallStats').innerHTML = report;
     document.getElementById('downloadOverallBtn').style.display = 'inline-block';
+    const csvBtn = document.getElementById('downloadOverallCsvBtn');
+    if (csvBtn) csvBtn.style.display = 'inline-block';
 }
 
 function updateClassDropdowns() {
@@ -828,6 +845,71 @@ function downloadReport(content, filename) {
     showMessage('Report downloaded successfully!', 'success');
 }
 
+function downloadCSV(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showMessage('CSV downloaded successfully!', 'success');
+}
+
+function downloadIndividualCSV() {
+    const studentId = document.getElementById('individualStudent').value;
+    if (!studentId) return;
+    const student = students.find(s => s.studentId === studentId);
+    if (!student) return;
+    const rows = [];
+    rows.push(['Name', 'Student ID', 'Email', 'Class']);
+    rows.push([student.name, student.studentId, student.email, student.className]);
+    rows.push([]);
+    rows.push(['Date', 'Status']);
+    const keys = Object.keys(student.attendance);
+    if (keys.length === 0) rows.push(['-', '-']);
+    keys.forEach(d => {
+        rows.push([d, student.attendance[d] ? 'Present' : 'Absent']);
+    });
+    const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    downloadCSV(csv, `Individual_${student.name}_${student.studentId}.csv`);
+}
+
+function downloadClassCSV() {
+    const className = document.getElementById('classReport').value;
+    if (!className) return;
+    const classStudents = students.filter(s => s.className === className);
+    const rows = [];
+    rows.push(['Student Name', 'Student ID', 'Email', 'Attendance %']);
+    classStudents.forEach(st => {
+        const percentage = calculateStudentAttendancePercentage(st);
+        rows.push([st.name, st.studentId, st.email, percentage.toFixed(1)]);
+    });
+    const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    downloadCSV(csv, `Class_${className.replace(/\s+/g, '_')}.csv`);
+}
+
+function downloadOverallCSV() {
+    const rows = [];
+    rows.push(['Metric', 'Value']);
+    rows.push(['Total Students', students.length]);
+    rows.push(['Total Classes', calculateTotalClasses()]);
+    rows.push(['Overall Average Attendance', calculateAverageAttendance().toFixed(1) + '%']);
+    rows.push(['Today\'s Attendance', calculateTodayAttendance().toFixed(1) + '%']);
+    rows.push([]);
+    rows.push(['Class Name', 'Students', 'Average Attendance %']);
+    const classesSet = [...new Set(students.map(s => s.className))];
+    classesSet.forEach(className => {
+        const classStudents = students.filter(s => s.className === className);
+        const classAvg = classStudents.reduce((sum, student) => sum + calculateStudentAttendancePercentage(student), 0) / classStudents.length;
+        rows.push([className, classStudents.length, classAvg.toFixed(1)]);
+    });
+    const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    downloadCSV(csv, `Overall_${new Date().toISOString().split('T')[0]}.csv`);
+}
+
 function updateStorageInfo() {
     const storageStatus = document.getElementById('storageStatus');
     const storageStudents = document.getElementById('storageStudents');
@@ -879,4 +961,66 @@ function updateStorageInfo() {
         localStorageStatus.style.color = 'rgb(220, 53, 69)';
         console.error('Error updating storage info:', error);
     }
+}
+
+// Backend sync helpers
+let classes = [];
+let currentSession = null;
+
+async function loadClassesAndStudents() {
+    if (!apiToken) {
+        updateStudentsTable();
+        updateClassDropdowns();
+        updateStudentDropdowns();
+        return;
+    }
+    try {
+        classes = await fetchJSON('/api/classes');
+        const allStudents = [];
+        for (const c of classes) {
+            const cStudents = await fetchJSON(`/api/classes/${c.id}/students`);
+            for (const s of cStudents) {
+                allStudents.push({
+                    _backendId: s.id,
+                    studentId: s.student_ext_id,
+                    name: s.name,
+                    email: s.email || '',
+                    className: classes.find(cls => cls.id === s.class_id)?.name || '',
+                    attendance: {}
+                });
+            }
+        }
+        students = allStudents;
+        updateStudentsTable();
+        updateClassDropdowns();
+        updateStudentDropdowns();
+        // prepare session for selected class/date
+        const selectedClassName = document.getElementById('selectedClass').value;
+        if (selectedClassName) {
+            const cls = classes.find(c => c.name === selectedClassName);
+            const date = document.getElementById('attendanceDate').value;
+            await ensureSession(cls?.id, date);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function ensureSession(classId, date) {
+    if (!classId || !date) return;
+    const existing = await fetchJSON(`/api/sessions?classId=${classId}&date=${date}`);
+    if (existing.length > 0) {
+        currentSession = existing[0];
+        return;
+    }
+    // create open session with no times (allowed) – teachers only
+    try {
+        currentSession = await fetchJSON('/api/sessions', { method: 'POST', body: JSON.stringify({ classId, date }) });
+    } catch (err) {
+        showMessage('Unable to open session: ' + err.message, 'error');
+    }
+}
+
+async function createClass(name) {
+    await fetchJSON('/api/classes', { method: 'POST', body: JSON.stringify({ name }) });
 }

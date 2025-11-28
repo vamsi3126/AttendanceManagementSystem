@@ -9,17 +9,25 @@
 <body>
     <div class="container">
         <header>
-            <h1>📚 Attendance Management System</h1>
-            <p>Track student attendance easily and efficiently</p>
+            <div class="brand">
+                <div class="brand-icon">📚</div>
+                <div class="brand-text">
+                    <h1>Attendance Management System</h1>
+                    <p>Track classes, sessions, and attendance with ease</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary theme-toggle" onclick="toggleTheme()" id="themeToggle">Toggle Theme</button>
+            </div>
         </header>
 
         <nav class="tabs">
-            <button id="tab-dashboard" class="tab-button active" onclick="showTab('dashboard')">Dashboard</button>
-            <button id="tab-students" class="tab-button" onclick="showTab('students')">Students</button>
-            <button id="tab-attendance" class="tab-button" onclick="showTab('attendance')">Mark Attendance</button>
-            <button id="tab-reports" class="tab-button" onclick="showTab('reports')">Reports</button>
-            <button id="tab-data" class="tab-button" onclick="showTab('data')">Data Management</button>
-            <button id="tab-auth" class="tab-button" onclick="showTab('auth')">Login</button>
+            <button id="tab-dashboard" class="tab-button active" onclick="showTab(event, 'dashboard')">🏠 Dashboard</button>
+            <button id="tab-students" class="tab-button" onclick="showTab(event, 'students')">👥 Students</button>
+            <button id="tab-attendance" class="tab-button" onclick="showTab(event, 'attendance')">✅ Mark Attendance</button>
+            <button id="tab-reports" class="tab-button" onclick="showTab(event, 'reports')">📊 Reports</button>
+            <button id="tab-data" class="tab-button" onclick="showTab(event, 'data')">🗂️ Data</button>
+            <button id="tab-auth" class="tab-button" onclick="showTab(event, 'auth')">🔐 Account</button>
         </nav>
 
         <div id="dashboard" class="tab-content active">
@@ -53,7 +61,10 @@
         <div id="students" class="tab-content">
             <div class="section-header">
                 <h2>Student Management</h2>
-                <button class="btn btn-primary" onclick="showAddStudentForm()">Add New Student</button>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="studentSearch" placeholder="Search students" oninput="filterStudentsTable()" style="padding:10px; border:2px solid rgb(221,221,221); border-radius:8px;">
+                    <button class="btn btn-primary" onclick="showAddStudentForm()">Add New Student</button>
+                </div>
             </div>
             
             <div id="addStudentForm" class="form-container" style="display: none;">
@@ -156,6 +167,7 @@
                     </select>
                     <button class="btn btn-primary" onclick="generateIndividualReport()">Generate Report</button>
                     <button class="btn btn-success" onclick="downloadIndividualReport()" id="downloadIndividualBtn" style="display: none;">📥 Download Report</button>
+                    <button class="btn btn-secondary" onclick="downloadIndividualCSV()" id="downloadIndividualCsvBtn" style="display: none;">📄 Download CSV</button>
                     <div id="individualReport" class="report-content"></div>
                 </div>
                 
@@ -166,6 +178,7 @@
                     </select>
                     <button class="btn btn-primary" onclick="generateClassReport()">Generate Report</button>
                     <button class="btn btn-success" onclick="downloadClassReport()" id="downloadClassBtn" style="display: none;">📥 Download Report</button>
+                    <button class="btn btn-secondary" onclick="downloadClassCSV()" id="downloadClassCsvBtn" style="display: none;">📄 Download CSV</button>
                     <div id="classReportContent" class="report-content"></div>
                 </div>
                 
@@ -173,6 +186,7 @@
                     <h3>Overall Statistics</h3>
                     <button class="btn btn-primary" onclick="generateOverallStats()">Generate Stats</button>
                     <button class="btn btn-success" onclick="downloadOverallStats()" id="downloadOverallBtn" style="display: none;">📥 Download Report</button>
+                    <button class="btn btn-secondary" onclick="downloadOverallCSV()" id="downloadOverallCsvBtn" style="display: none;">📄 Download CSV</button>
                     <div id="overallStats" class="report-content"></div>
                 </div>
             </div>
